@@ -18,6 +18,24 @@ def parse_copybook(copybook_path):
     return fields
 
 # Example usage:
-schema = parse_copybook("employee.cpy")
-print(schema)
+#schema = parse_copybook("employee.cpy")
+#print(schema)
 # [('EMP_ID', 5, 'STRING'), ('EMP_NAME', 15, 'STRING'), ('EMP_DEPT', 5, 'STRING'), ('EMP_SALARY', 10, 'NUMERIC')]
+
+
+def build_schema_with_positions(fields):
+    """
+    Takes [(field, length, type)] and returns [(field, start, end, type)]
+    """
+    schema = []
+    pos = 1
+    for name, length, ftype in fields:
+        schema.append((name, pos, pos + length - 1, ftype))
+        pos += length
+    return schema
+
+# Example
+#fields = [('EMP_ID', 5, 'STRING'), ('EMP_NAME', 15, 'STRING')]
+#schema_with_pos = build_schema_with_positions(fields)
+#print(schema_with_pos)
+# [('EMP_ID', 1, 5, 'STRING'), ('EMP_NAME', 6, 20, 'STRING')]
