@@ -1,0 +1,45 @@
+{
+  "aws": {
+    "access_key_id": "your_access_key_here",
+    "secret_access_key": "your_secret_key_here",
+    "region": "us-east-1"
+  },
+  "s3_paths": {
+    "legacy_file": "s3://your-bucket/legacy-data/customer_master_legacy.txt",
+    "modern_file": "s3://your-bucket/modern-data/customer_master_modern.txt",
+    "copybook": "s3://your-bucket/copybooks/customer_master.cob",
+    "output_path": "s3://your-bucket/validation-results/",
+    "mismatch_details": "s3://your-bucket/validation-results/mismatches/",
+    "summary_report": "s3://your-bucket/validation-results/summary/"
+  },
+  "spark": {
+    "app_name": "COBOL_FixedWidth_DataValidation",
+    "master": "local[*]",
+    "executor_memory": "6g",
+    "driver_memory": "2g",
+    "executor_cores": "4"
+  },
+  "validation": {
+    "primary_keys": [
+      "CUSTOMER_ID"
+    ],
+    "ignore_fields": [
+      "FILLER",
+      "CREATED_TIME",
+      "UPDATED_TIME",
+      "RECORD_VERSION"
+    ],
+    "tolerance": {
+      "ACCOUNT_BALANCE": 0.01,
+      "CREDIT_LIMIT": 0.01
+    },
+    "date_format": "yyyyMMdd",
+    "time_format": "HHmmss"
+  },
+  "quality_checks": {
+    "check_record_length": true,
+    "check_mandatory_fields": true,
+    "check_data_types": true,
+    "max_null_percentage": 5.0
+  }
+}
