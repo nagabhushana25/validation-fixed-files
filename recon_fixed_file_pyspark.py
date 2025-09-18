@@ -3,38 +3,35 @@ from pyspark.sql.functions import col, trim, regexp_replace, lit, when, array, s
 
 spark = SparkSession.builder.appName("FixedWidthValidation").getOrCreate()
 
-# Example: copybook fields extracted manually or with parser
+# Example copybook schema (start and end positions are 1-based, inclusive)
 copybook_schema = [
-    ("CUSIP", 9),
-    ("BROKERAGE_ACCT", 12),
-    ("POSITION_ID", 10),
-    ("PARTITION_ID", 5)
+    ("CUSIP", 1, 9, 'STRING'),
+    ("BROKERAGE_ACCT", 10, 21, 'STRING'),
+    ("POSITION_ID", 22, 31, 'STRING'),
+    ("PARTITION_ID", 32, 36, 'STRING')
 ]
 
 # Function to slice fixed-width fields
 def parse_fixed_width(line, schema):
     values = []
-    pos = 0
-    for name, length in schema:
-        values.append(line[pos:pos+length])
-        pos += length
+    for name, start, end, ftype in schema:
+        # convert from 1-based inclusive to Python slice [start-1:end]
+        values.append(line[start-1:end].rstrip())
     return values
 
 # Load legacy file
 legacy_rdd = spark.sparkContext.textFile("legacy_file.txt").map(
     lambda line: parse_fixed_width(line, copybook_schema)
 )
-
 legacy_df = legacy_rdd.toDF([f[0] for f in copybook_schema])
 
 # Load modern file
 modern_rdd = spark.sparkContext.textFile("modern_file.txt").map(
     lambda line: parse_fixed_width(line, copybook_schema)
 )
-
 modern_df = modern_rdd.toDF([f[0] for f in copybook_schema])
 
-# Normalize spaces
+# Normalize spaces (trim + collapse multiple spaces)
 def normalize_spaces(df):
     return df.select([
         regexp_replace(trim(col(c)), " +", " ").alias(c) for c in df.columns
@@ -43,31 +40,27 @@ def normalize_spaces(df):
 legacy_df = normalize_spaces(legacy_df)
 modern_df = normalize_spaces(modern_df)
 
-# Join by record index (assuming same order)
-legacy_df = legacy_df.withColumn("row_id", lit(None)).rdd.zipWithIndex().map(
+# Add row_id for joining line-by-line
+legacy_df = legacy_df.rdd.zipWithIndex().map(
     lambda x: (*x[0], x[1])
 ).toDF([*legacy_df.columns, "row_id"])
 
-modern_df = modern_df.withColumn("row_id", lit(None)).rdd.zipWithIndex().map(
+modern_df = modern_df.rdd.zipWithIndex().map(
     lambda x: (*x[0], x[1])
 ).toDF([*modern_df.columns, "row_id"])
 
-# Join
-joined = legacy_df.join(modern_df, "row_id", "outer").select(
-    *[col(f"{c}") for c in legacy_df.columns if c != "row_id"],
-    *[col(f"{c}") for c in modern_df.columns if c != "row_id"],
-    "row_id"
-)
+# Join datasets on row_id
+joined = legacy_df.alias("l").join(modern_df.alias("m"), "row_id")
 
 # Compare fields and collect mismatches
 mismatch_exprs = []
-for field, _ in copybook_schema:
+for field, _, _, _ in copybook_schema:
     mismatch_exprs.append(
-        when(col(f"{field}") != col(f"{field}_1"), lit(field)).otherwise(lit(None))
+        when(col(f"l.{field}") != col(f"m.{field}"), lit(field)).otherwise(lit(None))
     )
 
 joined = joined.withColumn("mismatched_fields", array(*mismatch_exprs))
 result = joined.withColumn("mismatch_count", size(col("mismatched_fields")))
 
-# Save results
+# Save results (bad + good records)
 result.write.mode("overwrite").csv("validation_results")
