@@ -17,7 +17,7 @@ Comments: Ignores COBOL comment lines and formatting
 
 2. Sample COBOL Copybook Support
 
-text
+
 01  CUSTOMER-MASTER-RECORD.
     05  CUSTOMER-ID                 PIC X(10).
     05  CUSTOMER-INFO.
@@ -27,6 +27,7 @@ text
     05  PHONE-NUMBERS               OCCURS 3 TIMES.
         10  PHONE-NUMBER            PIC X(15).
         10  PHONE-TYPE              PIC X(1).
+
 Quick Start Guide
 Step 1: Prepare Your Environment
 
